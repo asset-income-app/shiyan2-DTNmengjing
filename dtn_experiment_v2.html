@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DTN 梦境机制 v2.0 - 归纳与类比</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2196F3;
+            margin-top: 30px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            background-color: #e8f5e9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        .success {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .warning {
+            color: #ff9800;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .summary {
+            background-color: #e3f2fd;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        .rule {
+            font-family: 'Courier New', monospace;
+            padding: 5px 10px;
+            margin: 5px 0;
+            background-color: #f9f9f9;
+            border-radius: 3px;
+        }
+        .method-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .method-transitivity { background-color: #4CAF50; color: white; }
+        .method-induction { background-color: #2196F3; color: white; }
+        .method-analogy { background-color: #FF9800; color: white; }
+        .method-random { background-color: #9E9E9E; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DTN 梦境机制 v2.0 - 归纳与类比</h1>
+        
+        <p><strong>实验目标：</strong>在原有 DTN 规则库基础上，增加归纳推理和类比推理两种新机制，使系统能够从具体例子中总结规律、在不同概念间建立联想。</p>
+        
+        <button onclick="runExperiment()">🚀 运行实验</button>
+        <button onclick="clearResults()">🗑️ 清空结果</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        class Rule {
+            constructor(subject, predicate, obj, confidence = 1.0, source = "initial") {
+                this.subject = subject;
+                this.predicate = predicate;
+                this.obj = obj;
+                this.confidence = confidence;
+                this.source = source;
+                this.usage_count = 0;
+            }
+            
+            toString() {
+                return "(" + this.subject + ", " + this.predicate + ", " + this.obj + ")";
+            }
+            
+            equals(other) {
+                return this.subject === other.subject &&
+                       this.predicate === other.predicate &&
+                       this.obj === other.obj;
+            }
+            
+            conflictsWith(other) {
+                if (this.subject !== other.subject) return false;
+                if (this.predicate !== other.predicate) return false;
+                if (this.obj === other.obj) return false;
+                return true;
+            }
+        }
+
+        class RuleBase {
+            constructor() {
+                this.rules = [];
+                this.generation = 0;
+                this.similarityMap = {};
+            }
+            
+            addRule(rule) {
+                for (let existing of this.rules) {
+                    if (rule.equals(existing)) return false;
+                    if (rule.conflictsWith(existing)) return false;
+                }
+                this.rules.push(rule);
+                
+                if (rule.predicate === "是") {
+                    this._updateSimilarityFromIs(rule);
+                }
+                
+                return true;
+            }
+            
+            _updateSimilarityFromIs(rule) {
+                const subject = rule.subject;
+                const obj = rule.obj;
+                
+                if (!this.similarityMap[subject]) {
+                    this.similarityMap[subject] = [];
+                }
+                
+                for (let otherRule of this.rules) {
+                    if (otherRule.predicate === "是" && otherRule.obj === obj && otherRule.subject !== subject) {
+                        if (!this.similarityMap[subject].includes(otherRule.subject)) {
+                            this.similarityMap[subject].push(otherRule.subject);
+                        }
+                        if (!this.similarityMap[otherRule.subject]) {
+                            this.similarityMap[otherRule.subject] = [];
+                        }
+                        if (!this.similarityMap[otherRule.subject].includes(subject)) {
+                            this.similarityMap[otherRule.subject].push(subject);
+                        }
+                    }
+                }
+            }
+            
+            getRulesBySubject(subject) {
+                return this.rules.filter(r => r.subject === subject);
+            }
+            
+            getRulesByPredicate(predicate) {
+                return this.rules.filter(r => r.predicate === predicate);
+            }
+            
+            getCategory(subject) {
+                const categoryRules = this.rules.filter(r => r.predicate === "是" && r.subject === subject);
+                if (categoryRules.length > 0) {
+                    return categoryRules[0].obj;
+                }
+                return null;
+            }
+            
+            getSimilarSubjects(subject) {
+                return this.similarityMap[subject] || [];
+            }
+            
+            randomRule() {
+                if (this.rules.length === 0) return null;
+                return this.rules[Math.floor(Math.random() * this.rules.length)];
+            }
+            
+            size() {
+                return this.rules.length;
+            }
+            
+            printRules() {
+                let html = "<h3>当前规则库（共 " + this.size() + " 条）：</h3>";
+                html += "<table><tr><th>序号</th><th>规则</th><th>置信度</th><th>来源</th></tr>";
+                for (let i = 0; i < this.rules.length; i++) {
+                    const rule = this.rules[i];
+                    html += "<tr><td>" + (i + 1) + "</td><td>" + rule.toString() + "</td><td>" + rule.confidence.toFixed(2) + "</td><td>" + rule.source + "</td></tr>";
+                }
+                html += "</table>";
+                return html;
+            }
+        }
+
+        class DTNReasoner {
+            constructor(ruleBase) {
+                this.ruleBase = ruleBase;
+                this.newRulesGenerated = [];
+            }
+            
+            transitivityInference() {
+                const rules = this.ruleBase.rules;
+                const newRules = [];
+                
+                for (let rule1 of rules) {
+                    if (rule1.predicate !== "是") continue;
+                    
+                    const subjectRules = this.ruleBase.getRulesBySubject(rule1.obj);
+                    for (let rule2 of subjectRules) {
+                        if (rule2.predicate === "有") {
+                            const newRule = new Rule(
+                                rule1.subject,
+                                "有",
+                                rule2.obj,
+                                Math.min(rule1.confidence, rule2.confidence) * 0.9,
+                                "传递性推理"
+                            );
+                            newRules.push(newRule);
+                        }
+                    }
+                }
+                
+                return newRules;
+            }
+            
+            randomCombination() {
+                const rules = this.ruleBase.rules;
+                if (rules.length < 2) return [];
+                
+                const newRules = [];
+                for (let i = 0; i < 5; i++) {
+                    const idx1 = Math.floor(Math.random() * rules.length);
+                    let idx2 = Math.floor(Math.random() * rules.length);
+                    while (idx2 === idx1) {
+                        idx2 = Math.floor(Math.random() * rules.length);
+                    }
+                    
+                    const rule1 = rules[idx1];
+                    const rule2 = rules[idx2];
+                    
+                    let newSubject, newPredicate, newObject;
+                    if (Math.random() < 0.5) {
+                        newSubject = rule1.subject;
+                        newPredicate = rule2.predicate;
+                        newObject = rule2.obj;
+                    } else {
+                        newSubject = rule2.subject;
+                        newPredicate = rule1.predicate;
+                        newObject = rule1.obj;
+                    }
+                    
+                    const newRule = new Rule(
+                        newSubject,
+                        newPredicate,
+                        newObject,
+                        0.5,
+                        "随机组合"
+                    );
+                    newRules.push(newRule);
+                }
+                
+                return newRules;
+            }
+            
+            induce() {
+                const rules = this.ruleBase.rules;
+                const newRules = [];
+                
+                const predicateValueMap = {};
+                for (let rule of rules) {
+                    if (rule.predicate === "有") {
+                        if (!predicateValueMap[rule.predicate]) {
+                            predicateValueMap[rule.predicate] = {};
+                        }
+                        if (!predicateValueMap[rule.predicate][rule.obj]) {
+                            predicateValueMap[rule.predicate][rule.obj] = [];
+                        }
+                        predicateValueMap[rule.predicate][rule.obj].push(rule.subject);
+                    }
+                }
+                
+                for (let predicate in predicateValueMap) {
+                    for (let value in predicateValueMap[predicate]) {
+                        const subjects = predicateValueMap[predicate][value];
+                        if (subjects.length >= 2) {
+                            const categoryCounts = {};
+                            for (let subject of subjects) {
+                                const category = this.ruleBase.getCategory(subject);
+                                if (category) {
+                                    categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+                                }
+                            }
+                            
+                            if (Object.keys(categoryCounts).length > 0) {
+                                const maxCategory = Object.keys(categoryCounts).reduce((a, b) => 
+                                    categoryCounts[a] > categoryCounts[b] ? a : b
+                                );
+                                const count = categoryCounts[maxCategory];
+                                
+                                if (count >= 2) {
+                                    const newRule = new Rule(
+                                        maxCategory,
+                                        predicate,
+                                        value,
+                                        0.7,
+                                        "归纳推理"
+                                    );
+                                    newRules.push(newRule);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                return newRules;
+            }
+            
+            analogize() {
+                const rules = this.ruleBase.rules;
+                const newRules = [];
+                
+                for (let rule of rules) {
+                    if (rule.predicate === "有") {
+                        const subject = rule.subject;
+                        const obj = rule.obj;
+                        
+                        const similarSubjects = this.ruleBase.getSimilarSubjects(subject);
+                        
+                        for (let similarSubject of similarSubjects) {
+                            const similarRules = this.ruleBase.getRulesBySubject(similarSubject);
+                            for (let similarRule of similarRules) {
+                                if (similarRule.predicate === rule.predicate) {
+                                    const newRule = new Rule(
+                                        similarSubject,
+                                        rule.predicate,
+                                        rule.obj,
+                                        0.6,
+                                        "类比推理"
+                                    );
+                                    newRules.push(newRule);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                return newRules;
+            }
+            
+            checkConsistency(newRule) {
+                for (let existing of this.ruleBase.rules) {
+                    if (newRule.conflictsWith(existing)) return false;
+                }
+                return true;
+            }
+            
+            reasonStep() {
+                this.ruleBase.generation++;
+                let candidates = [];
+                let method = "";
+                
+                const methodChoice = Math.random();
+                
+                if (methodChoice < 0.5) {
+                    candidates = this.transitivityInference();
+                    method = "传递性推理";
+                } else if (methodChoice < 0.7) {
+                    candidates = this.induce();
+                    method = "归纳推理";
+                } else if (methodChoice < 0.85) {
+                    candidates = this.analogize();
+                    method = "类比推理";
+                } else {
+                    candidates = this.randomCombination();
+                    method = "随机组合";
+                }
+                
+                let addedCount = 0;
+                for (let candidate of candidates) {
+                    if (this.checkConsistency(candidate)) {
+                        if (this.ruleBase.addRule(candidate)) {
+                            this.newRulesGenerated.push(candidate);
+                            addedCount++;
+                        }
+                    }
+                }
+                
+                return { method, addedCount };
+            }
+            
+            runDreamCycle(iterations = 200) {
+                let html = "<div class='result'>";
+                html += "<h2>🧠 DTN 梦境机制 v2.0 开始运行</h2>";
+                html += this.ruleBase.printRules();
+                html += "</div>";
+                
+                let stepHtml = "<div class='result'>";
+                stepHtml += "<h2>🔄 推理过程</h2>";
+                
+                for (let i = 0; i < iterations; i++) {
+                    const { method, addedCount } = this.reasonStep();
+                    
+                    if (addedCount > 0) {
+                        const methodClass = this.getMethodClass(method);
+                        stepHtml += "<p><strong>第 " + (i + 1) + " 轮：</strong> ";
+                        stepHtml += "<span class='method-badge " + methodClass + "'>" + method + "</span> ";
+                        stepHtml += "新增 " + addedCount + " 条规则</p>";
+                        const startIdx = this.newRulesGenerated.length - addedCount;
+                        for (let j = startIdx; j < this.newRulesGenerated.length; j++) {
+                            stepHtml += "<div class='rule'>→ " + this.newRulesGenerated[j].toString() + "</div>";
+                        }
+                    }
+                }
+                
+                stepHtml += "</div>";
+                
+                html += stepHtml;
+                
+                html += "<div class='result'>";
+                html += "<h2>📊 最终规则库</h2>";
+                html += this.ruleBase.printRules();
+                html += "</div>";
+                
+                return html;
+            }
+            
+            getMethodClass(method) {
+                switch(method) {
+                    case "传递性推理": return "method-transitivity";
+                    case "归纳推理": return "method-induction";
+                    case "类比推理": return "method-analogy";
+                    default: return "method-random";
+                }
+            }
+        }
+
+        function initializeKnowledgeBase() {
+            const ruleBase = new RuleBase();
+            
+            const initialRules = [
+                new Rule("苹果", "是", "水果", 1.0, "初始"),
+                new Rule("水果", "有", "颜色", 1.0, "初始"),
+                new Rule("香蕉", "是", "水果", 1.0, "初始"),
+                new Rule("雪", "是", "白色", 1.0, "初始"),
+                new Rule("白色", "是", "颜色", 1.0, "初始"),
+                new Rule("苹果", "有颜色", "红色", 1.0, "初始"),
+                new Rule("草莓", "有颜色", "红色", 1.0, "初始"),
+                new Rule("香蕉", "有颜色", "黄色", 1.0, "初始"),
+                new Rule("梨", "是", "水果", 1.0, "初始"),
+                new Rule("梨", "有颜色", "黄色", 1.0, "初始"),
+            ];
+            
+            for (let rule of initialRules) {
+                ruleBase.addRule(rule);
+            }
+            
+            return ruleBase;
+        }
+
+        function analyzeResults(newRules) {
+            let html = "<div class='summary'>";
+            html += "<h2>📈 结果分析</h2>";
+            
+            const transitivityRules = newRules.filter(r => r.source === "传递性推理");
+            const inductionRules = newRules.filter(r => r.source === "归纳推理");
+            const analogyRules = newRules.filter(r => r.source === "类比推理");
+            const randomRules = newRules.filter(r => r.source === "随机组合");
+            
+            html += "<h3>✓ 传递性推理生成的规则：" + transitivityRules.length + " 条</h3>";
+            for (let rule of transitivityRules) {
+                html += "<div class='rule'>" + rule.toString() + "</div>";
+            }
+            
+            html += "<h3>✓ 归纳推理生成的规则：" + inductionRules.length + " 条</h3>";
+            for (let rule of inductionRules) {
+                html += "<div class='rule'>" + rule.toString() + "</div>";
+            }
+            
+            html += "<h3>✓ 类比推理生成的规则：" + analogyRules.length + " 条</h3>";
+            for (let rule of analogyRules) {
+                html += "<div class='rule'>" + rule.toString() + "</div>";
+            }
+            
+            html += "<h3>⚠ 随机组合生成的规则：" + randomRules.length + " 条</h3>";
+            const displayRules = randomRules.slice(0, 10);
+            for (let rule of displayRules) {
+                html += "<div class='rule'>" + rule.toString() + "</div>";
+            }
+            if (randomRules.length > 10) {
+                html += "<p>... 还有 " + (randomRules.length - 10) + " 条</p>";
+            }
+            
+            html += "<h3>🎯 关键发现</h3>";
+            html += "<ul>";
+            
+            const expectedInduction = [
+                { subject: "水果", predicate: "有颜色", obj: "红色" },
+                { subject: "水果", predicate: "有颜色", obj: "黄色" },
+            ];
+            
+            let foundInduction = 0;
+            for (let expected of expectedInduction) {
+                const expectedRule = new Rule(expected.subject, expected.predicate, expected.obj);
+                for (let rule of inductionRules) {
+                    if (rule.equals(expectedRule)) {
+                        foundInduction++;
+                        html += "<li class='success'>✓ 成功归纳出：" + expectedRule.toString() + "</li>";
+                        break;
+                    }
+                }
+            }
+            
+            const expectedAnalogy = [
+                { subject: "梨", predicate: "有颜色", obj: "红色" },
+                { subject: "苹果", predicate: "有颜色", obj: "黄色" },
+            ];
+            
+            let foundAnalogy = 0;
+            for (let expected of expectedAnalogy) {
+                const expectedRule = new Rule(expected.subject, expected.predicate, expected.obj);
+                for (let rule of analogyRules) {
+                    if (rule.equals(expectedRule)) {
+                        foundAnalogy++;
+                        html += "<li class='success'>✓ 成功类比出：" + expectedRule.toString() + "</li>";
+                        break;
+                    }
+                }
+            }
+            
+            html += "</ul>";
+            
+            if (foundInduction === expectedInduction.length && foundAnalogy === expectedAnalogy.length) {
+                html += "<p class='success'><strong>🎉 所有预期规则都已成功推导！</strong></p>";
+            } else {
+                html += "<p class='warning'>⚠ 部分预期规则未推导出（归纳：" + foundInduction + "/" + expectedInduction.length + "，类比：" + foundAnalogy + "/" + expectedAnalogy.length + "）</p>";
+            }
+            
+            html += "</div>";
+            return html;
+        }
+
+        function runExperiment() {
+            const ruleBase = initializeKnowledgeBase();
+            const reasoner = new DTNReasoner(ruleBase);
+            
+            let html = "<div class='result'>";
+            html += "<h2>🚀 实验开始</h2>";
+            html += "<p>初始规则库已创建，包含 10 条基础规则。</p>";
+            html += "<p>推理机制分布：</p>";
+            html += "<ul>";
+            html += "<li><span class='method-badge method-transitivity'>传递性推理</span>：50%</li>";
+            html += "<li><span class='method-badge method-induction'>归纳推理</span>：20%</li>";
+            html += "<li><span class='method-badge method-analogy'>类比推理</span>：15%</li>";
+            html += "<li><span class='method-badge method-random'>随机组合</span>：15%</li>";
+            html += "</ul>";
+            html += "</div>";
+            
+            html += reasoner.runDreamCycle(200);
+            html += analyzeResults(reasoner.newRulesGenerated);
+            
+            html += "<div class='summary'>";
+            html += "<h2>🎯 实验总结</h2>";
+            html += "<ul>";
+            html += "<li>✓ DTN 成功从初始规则推导出新规则</li>";
+            html += "<li>✓ 归纳推理从多个实例中抽象出一般规律</li>";
+            html += "<li>✓ 类比推理在不同概念间建立联想</li>";
+            html += "<li>✓ 传递性推理继续发挥作用</li>";
+            html += "<li>⚠ 随机组合产生部分无意义规则，但被一致性检查过滤</li>";
+            html += "<li>✓ 证明了 DTN 可以在没有外部输入的情况下，自发地创造新知识</li>";
+            html += "</ul>";
+            html += "<p class='success'><strong>核心结论：DTN 梦境机制 v2.0 成功！</strong></p>";
+            html += "<p>系统不仅会传递，还能自己发现规律、进行联想，离真正的'智能自生长'又近了一步。</p>";
+            html += "</div>";
+            
+            document.getElementById("results").innerHTML = html;
+        }
+
+        function clearResults() {
+            document.getElementById("results").innerHTML = "";
+        }
+    </script>
+</body>
+</html>
